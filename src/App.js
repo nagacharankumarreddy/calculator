@@ -1,4 +1,4 @@
-import { useReducer } from "react"
+import { useEffect, useReducer } from "react"
 import DigitButton from "./DigitButton"
 import OperationButton from "./OperationButton"
 import "./styles.css"
@@ -94,6 +94,8 @@ function reducer(state, { type, payload }) {
         operation: null,
         currentOperand: evaluate(state),
       }
+    default:
+      return state
   }
 }
 
@@ -115,6 +117,8 @@ function evaluate({ currentOperand, previousOperand, operation }) {
     case "÷":
       computation = prev / current
       break
+    default:
+      return ""
   }
 
   return computation.toString()
@@ -130,51 +134,90 @@ function formatOperand(operand) {
   return `${INTEGER_FORMATTER.format(integer)}.${decimal}`
 }
 
+const sizeClass = (text) =>
+  text.length > 14 ? "tiny" : text.length > 9 ? "small" : ""
+
 function App() {
   const [{ currentOperand, previousOperand, operation }, dispatch] = useReducer(
     reducer,
     {}
   )
 
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return
+      const { key } = event
+      if (/^[0-9.]$/.test(key)) {
+        dispatch({ type: ACTIONS.ADD_DIGIT, payload: { digit: key } })
+      } else if (key === "+" || key === "-" || key === "*") {
+        dispatch({ type: ACTIONS.CHOOSE_OPERATION, payload: { operation: key } })
+      } else if (key === "/") {
+        event.preventDefault()
+        dispatch({ type: ACTIONS.CHOOSE_OPERATION, payload: { operation: "÷" } })
+      } else if (key === "=" || (key === "Enter" && !event.target.closest("button"))) {
+        event.preventDefault()
+        dispatch({ type: ACTIONS.EVALUATE })
+      } else if (key === "Backspace") {
+        dispatch({ type: ACTIONS.DELETE_DIGIT })
+      } else if (key === "Escape" || key === "Delete") {
+        dispatch({ type: ACTIONS.CLEAR })
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [])
+
+  const current = formatOperand(currentOperand) ?? ""
+
   return (
-    <div className="calculator-grid">
-      <div className="output">
-        <div className="previous-operand">
-          {formatOperand(previousOperand)} {operation}
+    <main className="calculator">
+      <h1 className="title">Calculator</h1>
+      <div className="calculator-grid">
+        <div className="output" aria-live="polite">
+          <div className="previous-operand">
+            {formatOperand(previousOperand)} {operation === "*" ? "×" : operation}
+          </div>
+          <div className={`current-operand ${sizeClass(current)}`}>
+            {current || "0"}
+          </div>
         </div>
-        <div className="current-operand">{formatOperand(currentOperand)}</div>
-      </div>
       <button
-        className="span-two"
+        className="span-two key-clear"
         onClick={() => dispatch({ type: ACTIONS.CLEAR })}
       >
         AC
       </button>
-      <button onClick={() => dispatch({ type: ACTIONS.DELETE_DIGIT })}>
+      <button
+        className="key-clear"
+        aria-label="Delete"
+        onClick={() => dispatch({ type: ACTIONS.DELETE_DIGIT })}
+      >
         DEL
       </button>
-      <OperationButton operation="÷" dispatch={dispatch} />
+      <OperationButton operation="÷" dispatch={dispatch} active={operation} />
       <DigitButton digit="1" dispatch={dispatch} />
       <DigitButton digit="2" dispatch={dispatch} />
       <DigitButton digit="3" dispatch={dispatch} />
-      <OperationButton operation="*" dispatch={dispatch} />
+      <OperationButton operation="*" dispatch={dispatch} active={operation} />
       <DigitButton digit="4" dispatch={dispatch} />
       <DigitButton digit="5" dispatch={dispatch} />
       <DigitButton digit="6" dispatch={dispatch} />
-      <OperationButton operation="+" dispatch={dispatch} />
+      <OperationButton operation="+" dispatch={dispatch} active={operation} />
       <DigitButton digit="7" dispatch={dispatch} />
       <DigitButton digit="8" dispatch={dispatch} />
       <DigitButton digit="9" dispatch={dispatch} />
-      <OperationButton operation="-" dispatch={dispatch} />
+      <OperationButton operation="-" dispatch={dispatch} active={operation} />
       <DigitButton digit="." dispatch={dispatch} />
       <DigitButton digit="0" dispatch={dispatch} />
       <button
-        className="span-two"
+        className="span-two key-equals"
         onClick={() => dispatch({ type: ACTIONS.EVALUATE })}
       >
         =
       </button>
-    </div>
+      </div>
+      <p className="hint">Tip: you can also type with your keyboard</p>
+    </main>
   )
 }
 
